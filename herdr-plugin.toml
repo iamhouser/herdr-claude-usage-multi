@@ -1,0 +1,36 @@
+id = "houser.claude-usage"
+name = "Claude Usage"
+version = "0.2.0"
+min_herdr_version = "0.7.0"
+description = "Claude plan usage gauges on every space row (Session/Week %, color escalation, countdown to reset when a limit is exhausted). Multi-account aware: workspaces show the Claude profile their panes actually run. The exact numbers Claude Code shows in /status."
+platforms = ["macos", "linux"]
+
+[[actions]]
+id = "start"
+title = "Claude usage: start monitor"
+contexts = ["workspace"]
+command = ["python3", "monitor.py", "ensure"]
+
+[[actions]]
+id = "stop"
+title = "Claude usage: stop monitor"
+contexts = ["workspace"]
+command = ["python3", "monitor.py", "stop"]
+
+# Auto-start the monitor whenever the session produces activity,
+# so it survives herdr server restarts without manual action.
+[[events]]
+on = "workspace.created"
+command = ["python3", "monitor.py", "ensure"]
+
+[[events]]
+on = "pane.created"
+command = ["python3", "monitor.py", "ensure"]
+
+[[panes]]
+id = "usage"
+title = "Claude usage"
+placement = "popup"
+width = "70%"
+height = "45%"
+command = ["python3", "monitor.py", "popup"]

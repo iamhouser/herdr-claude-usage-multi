@@ -1,7 +1,7 @@
 id = "houser.claude-usage"
 name = "Claude Usage"
 version = "0.2.1"
-min_herdr_version = "0.7.0"
+min_herdr_version = "0.7.5"
 description = "Claude plan usage gauges on every space row (Session/Week %, color escalation, countdown to reset when a limit is exhausted). Multi-account aware: workspaces show the Claude profile their panes actually run. The exact numbers Claude Code shows in /status."
 platforms = ["macos", "linux"]
 

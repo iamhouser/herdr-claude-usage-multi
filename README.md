@@ -109,7 +109,7 @@ The endpoint is undocumented and may change; if it does, the rows simply expire 
 
 ## Requirements
 
-- Herdr ≥ 0.7.0, macOS or Linux, `python3` in `PATH`
+- Herdr ≥ 0.7.5 (the release that added plugin `[[startup]]` hooks), macOS or Linux, `python3` in `PATH`
 - Claude Code logged in on the same machine (that's where the credentials come from)
 
 ## Credits

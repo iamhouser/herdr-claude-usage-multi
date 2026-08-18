@@ -1,9 +1,15 @@
 id = "houser.claude-usage"
 name = "Claude Usage"
-version = "0.2.0"
+version = "0.2.1"
 min_herdr_version = "0.7.0"
 description = "Claude plan usage gauges on every space row (Session/Week %, color escalation, countdown to reset when a limit is exhausted). Multi-account aware: workspaces show the Claude profile their panes actually run. The exact numbers Claude Code shows in /status."
 platforms = ["macos", "linux"]
+
+# The monitor is a background process: it dies with the herdr server it talks to.
+# Restored panes emit no pane.created, so after a server restart the event hooks
+# below never fire - this runs ensure once as soon as the plugin is loaded.
+[[startup]]
+command = ["python3", "monitor.py", "ensure"]
 
 [[actions]]
 id = "start"

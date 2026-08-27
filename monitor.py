@@ -50,6 +50,8 @@ POLL_S = 300  # API poll; usage barely moves minute-to-minute
 TICK_S = 30  # local re-render for the countdown; costs no API calls
 TTL_MS = POLL_S * 4 * 1000  # tokens outlive a few failed fetches, then expire on their own
 REFRESH_S = 240  # re-report unchanged tokens well before the TTL expires
+STALE_S = POLL_S * 4  # a cached value older than this renders with a "?" marker
+CLEAR_S = POLL_S * 12  # and older than this stops rendering entirely
 GAUGE_CELLS = 10
 WARN_PCT, HOT_PCT = 70, 90
 VARIANTS = ("cu", "cu_warn", "cu_hot", "cu_out")  # each styled by its own sidebar row
@@ -256,6 +258,24 @@ def render(usage):
     return variant, f"{gauge} {session['pct']}/{week_pct}"
 
 
+def render_entry(entry, now):
+    """(variant, text) for a cached (usage, fetched_at) pair, or None.
+
+    Guards against silent fetch failures freezing the gauges (issue #1): a
+    value that has outlived a few polls gains a trailing "?" so the row is
+    visibly suspect, and one that has outlived many stops rendering, which
+    lets the sidebar token expire instead of showing frozen numbers.
+    """
+    usage, fetched_at = entry
+    age = now - fetched_at
+    if age > CLEAR_S:
+        return None
+    variant, text = render(usage)
+    if age > STALE_S:
+        text += " ?"
+    return variant, text
+
+
 # ------------------------------------------------------------------ daemon --
 
 def running_pid():
@@ -314,16 +334,18 @@ def cmd_daemon():
                 if usage == "ratelimited":
                     rate_limited = True
                 elif isinstance(usage, dict) and usage["session"]["pct"] is not None:
-                    # keep the last good value so a failed fetch never blanks the row
-                    last_good[account["name"]] = usage
+                    # keep the last good value so a brief fetch failure never
+                    # blanks the row; render_entry ages it out if failures persist
+                    last_good[account["name"]] = (usage, now)
             # back off hard while rate-limited so we don't extend the penalty
             # window or compete with the user's own /status calls
             next_poll = now + (POLL_S * 3 if rate_limited else POLL_S)
         for ws in workspaces:
             ws_id = ws["workspace_id"]
-            usage = last_good.get(ws_account.get(ws_id))
-            if usage:
-                variant, text = render(usage)
+            entry = last_good.get(ws_account.get(ws_id))
+            rendered = render_entry(entry, now) if entry else None
+            if rendered:
+                variant, text = rendered
                 prev = published.get(ws_id)
                 if not prev or (prev[0], prev[1]) != (variant, text) or now - prev[2] > REFRESH_S:
                     report_variant(ws_id, variant, text)

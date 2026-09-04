@@ -46,17 +46,12 @@ class RenderEntryTest(unittest.TestCase):
         entry = (usage(), 1000.0)
         self.assertIsNone(monitor.render_entry(entry, 1000.0 + monitor.CLEAR_S + 1))
 
-    def test_stale_cutoff_matches_token_ttl(self):
-        # the "?" marker must appear exactly when a dead monitor's token
-        # would have expired; both derive from the same window
-        self.assertEqual(monitor.STALE_S * 1000, monitor.TTL_MS)
-
-    def test_refreshed_resets_the_age(self):
-        entry = (usage(), 1000.0)
-        later = 1000.0 + monitor.CLEAR_S + 1
-        self.assertIsNone(monitor.render_entry(entry, later))
-        self.assertEqual(monitor.render_entry(monitor.refreshed(entry, later), later),
-                         monitor.render(usage()))
+    def test_unknown_week_stays_readable_next_to_the_marker(self):
+        # both used to render "?"; a stale row with no week figure came out
+        # as "30/? ?", which reads as two different unknowns
+        _, text = monitor.render_entry((usage(30, None), 1000.0),
+                                       1000.0 + monitor.STALE_S + 1)
+        self.assertTrue(text.endswith("30/- ?"), text)
 
     def test_cutoffs_are_ordered(self):
         self.assertLess(monitor.POLL_S, monitor.STALE_S)

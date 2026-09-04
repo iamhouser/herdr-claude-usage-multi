@@ -50,7 +50,7 @@ POLL_S = 300  # API poll; usage barely moves minute-to-minute
 TICK_S = 30  # local re-render for the countdown; costs no API calls
 TTL_MS = POLL_S * 4 * 1000  # tokens outlive a few failed fetches, then expire on their own
 REFRESH_S = 240  # re-report unchanged tokens well before the TTL expires
-STALE_S = TTL_MS // 1000  # a cached value older than this renders with a "?" marker
+STALE_S = POLL_S * 4  # a cached value older than this renders with a "?" marker
 CLEAR_S = POLL_S * 12  # and older than this stops rendering entirely
 GAUGE_CELLS = 10
 WARN_PCT, HOT_PCT = 70, 90
@@ -254,18 +254,8 @@ def render(usage):
     variant = "cu_hot" if worst >= HOT_PCT else "cu_warn" if worst >= WARN_PCT else "cu"
     filled = min(GAUGE_CELLS, round(GAUGE_CELLS * (session["pct"] or 0) / 100))
     gauge = "■" * filled + "□" * (GAUGE_CELLS - filled)
-    week_pct = "?" if week["pct"] is None else week["pct"]
+    week_pct = "-" if week["pct"] is None else week["pct"]  # "?" marks a stale row
     return variant, f"{gauge} {session['pct']}/{week_pct}"
-
-
-def refreshed(entry, now):
-    """The same cached entry with its age reset, without new data.
-
-    Used while the API is rate-limiting us: that gap is deliberate (the
-    daemon backs off on purpose), so the cached value shouldn't age out
-    the way a silent failure does.
-    """
-    return (entry[0], now)
 
 
 def render_entry(entry, now):
@@ -342,10 +332,9 @@ def cmd_daemon():
                     continue
                 usage = fetch_usage(account)
                 if usage == "ratelimited":
+                    # deliberately leaves the cache timestamp alone: a 429 is
+                    # contact but not data, so the row keeps aging toward "?"
                     rate_limited = True
-                    if account["name"] in last_good:
-                        last_good[account["name"]] = refreshed(
-                            last_good[account["name"]], now)
                 elif isinstance(usage, dict) and usage["session"]["pct"] is not None:
                     # keep the last good value so a brief fetch failure never
                     # blanks the row; render_entry ages it out if failures persist

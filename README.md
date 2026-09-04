@@ -94,7 +94,7 @@ Create `accounts.json` in the plugin config dir (`herdr plugin list` prints it, 
 
 ## How it works
 
-- A single-file, stdlib-only Python daemon polls Anthropic's OAuth usage endpoint (`api.anthropic.com/api/oauth/usage`) every 5 minutes, once per account in use.
+- A single-file, stdlib-only Python daemon polls Anthropic's OAuth usage endpoint (`api.anthropic.com/api/oauth/usage`) every 5 minutes, once per account in use; each account keeps its own schedule, so a profile backing off behind a 429 does not slow the others down.
 - Credentials are the ones Claude Code already stores on the machine: the macOS Keychain entry (`Claude Code-credentials`, suffixed with `sha256(CLAUDE_CONFIG_DIR)[:8]` for non-default profiles) or `<config_dir>/.credentials.json` on Linux.
 - Pane cwds come from `herdr pane list`; usage rows are published per workspace with `herdr workspace report-metadata` and a 20-minute TTL, so stale data disappears on its own if the monitor dies.
 - If the monitor keeps running but its usage fetches fail, the cached value picks up a trailing `?` after 20 minutes and stops being published after an hour, so the gauges never freeze at plausible-looking numbers; a 429 ages the row like every other failure, being contact but not fresh numbers.

@@ -307,9 +307,9 @@ def cmd_daemon():
     with open(PIDFILE, "w") as f:
         f.write(str(os.getpid()))
     consecutive_failures = 0
-    last_good = {}  # account name -> last successful usage
+    last_good = {}  # account name -> (usage, monotonic ts of that fetch)
     published = {}  # workspace_id -> (variant, text, monotonic_ts)
-    next_poll = 0.0
+    next_poll = {}  # account name -> when that account may be polled again
     while True:
         if SOCKET_PATH and not os.path.exists(SOCKET_PATH):
             break  # herdr server is gone
@@ -325,23 +325,19 @@ def cmd_daemon():
             continue
         ws_account = map_workspaces(panes)
         now = time.monotonic()
-        if now >= next_poll:
-            rate_limited = False
-            for account in ACCOUNTS:
-                if account["name"] not in ws_account.values():
-                    continue
-                usage = fetch_usage(account)
-                if usage == "ratelimited":
-                    # deliberately leaves the cache timestamp alone: a 429 is
-                    # contact but not data, so the row keeps aging toward "?"
-                    rate_limited = True
-                elif isinstance(usage, dict) and usage["session"]["pct"] is not None:
-                    # keep the last good value so a brief fetch failure never
-                    # blanks the row; render_entry ages it out if failures persist
-                    last_good[account["name"]] = (usage, now)
-            # back off hard while rate-limited so we don't extend the penalty
-            # window or compete with the user's own /status calls
-            next_poll = now + (POLL_S * 3 if rate_limited else POLL_S)
+        for account in ACCOUNTS:
+            name = account["name"]
+            if name not in ws_account.values() or now < next_poll.get(name, 0.0):
+                continue
+            usage = fetch_usage(account)
+            if isinstance(usage, dict) and usage["session"]["pct"] is not None:
+                # keep the last good value so a brief fetch failure never blanks
+                # the row; render_entry ages it out if the failures persist
+                last_good[name] = (usage, now)
+            # a rate-limited account backs off alone, so it neither extends its
+            # own penalty window nor slows the healthy ones down; either way its
+            # cached row keeps aging, because contact is not data
+            next_poll[name] = now + (POLL_S * 3 if usage == "ratelimited" else POLL_S)
         for ws in workspaces:
             ws_id = ws["workspace_id"]
             entry = last_good.get(ws_account.get(ws_id))
